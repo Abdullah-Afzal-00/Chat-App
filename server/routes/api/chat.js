@@ -5,10 +5,10 @@ const auth = require("../../middleware/auth");
 
 const httpResponse = require("express-http-response");
 
-router.post("/send", auth.isToken, async (req, res, next) => {
-  const { message, recieverEmail } = req.body;
+router.post("/send/:id", auth.isToken, async (req, res, next) => {
+  const { message } = req.body;
 
-  const reciever = await User.findOne({ email: recieverEmail });
+  const reciever = await User.findOne({ email: req.params.id });
   if (!reciever) return res.status(404).send("No such reciever is Found");
 
   let data = new Message({
@@ -31,12 +31,20 @@ router.get("/recieve/:senderEmail", auth.isToken, async (req, res, next) => {
   const sender = await User.findOne({ email: req.params.senderEmail });
   console.log(sender._id);
   const messages = await Message.find({
-    Reciever: req.user.user_id,
-    Sender: sender._id,
+    $or: [
+      {
+        Reciever: req.user.user_id,
+        Sender: sender._id,
+      },
+      { Reciever: sender._id, Sender: req.user.user_id },
+    ],
   });
   if (!messages) res.status(500).send("Some Error Happened");
   if (messages.length === 0) res.send("No Message Found");
-  res.send(messages);
+  else
+    res
+      .status(200)
+      .send(messages.map((val, index) => val.toJSONFor(req.user.user_id)));
 });
 
 module.exports = router;
